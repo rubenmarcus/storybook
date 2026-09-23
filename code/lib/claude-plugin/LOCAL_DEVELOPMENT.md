@@ -9,6 +9,10 @@ Claude has two lifecycle layers:
 
 Run package scripts from the repository root with `yarn workspace @storybook/claude-code-plugin run <script>`, or from this package directory with `yarn run <script>`.
 
+## Skills
+
+The skills in `skills/` are the only copy a maintainer edits. The Codex plugin's skills are rendered from them, so after editing a skill run `yarn nx compile claude-plugin` from the repository root and commit the rendered files under `code/lib/codex-plugin/plugins/storybook/skills`. The plugin test fails while the committed Codex skills are stale.
+
 Validate the marketplace and plugin manifests:
 
 ```sh
