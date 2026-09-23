@@ -162,6 +162,8 @@ export function connectRuntimeToChannel(
   let withinReplyWindow = false;
   let repairQueued = false;
   let silenceTimer: ReturnType<typeof setTimeout> | undefined;
+  // The channel hands a hub its own forward back; that echo is not a reply to anything.
+  const forwardedReplies = new WeakSet<object>();
 
   const clearSilenceTimer = (): void => {
     if (silenceTimer !== undefined) {
@@ -226,6 +228,7 @@ export function connectRuntimeToChannel(
   const onSyncReply = (payload: unknown): void => {
     const snapshot = v.safeParse(syncReplySchema, payload);
     if (
+      forwardedReplies.has(payload as object) ||
       !snapshot.success ||
       snapshot.output.serviceId !== serviceId ||
       snapshot.output.runtimeId === ownRuntimeId
@@ -245,6 +248,7 @@ export function connectRuntimeToChannel(
     settleOutstandingRequest();
 
     if (outcome === 'installed' && relay) {
+      forwardedReplies.add(payload as object);
       channel.emit(SERVICE_SYNC_REPLY, payload);
     }
   };

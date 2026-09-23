@@ -493,10 +493,10 @@ export function createReconciler(options: {
       const index = insertIndexFor(stamp);
 
       const now = Date.now();
-      let inverse: JsonPatchOperation[] = [];
       let failedPath: string | undefined;
 
       setState((current) => {
+        let inverse: JsonPatchOperation[] = [];
         const isLater = index === log.length;
         const undone = isLater ? [] : undoToIndex(current, index);
         const result = applyJsonPatch(current, patch, (path) => {
@@ -510,6 +510,8 @@ export function createReconciler(options: {
           failedPath = result.path;
         }
         redoUndone(current, undone);
+        // Inside the batch: subscribers run when it ends and may throw, after state has changed.
+        appendOrInsert({ stamp, command, patch: [...patch], inverse, appliedAt: now }, index);
       });
 
       // A failed entry stays in the Log as a no-op, so every replica folds the same entries in the
@@ -526,7 +528,6 @@ export function createReconciler(options: {
         );
       }
 
-      appendOrInsert({ stamp, command, patch: [...patch], inverse, appliedAt: now }, index);
       return gap ? 'gap' : failedPath !== undefined ? 'unapplied' : 'accepted';
     },
   };

@@ -723,6 +723,50 @@ describe('createReconciler entries', () => {
   });
 });
 
+describe('createReconciler with a subscriber that throws', () => {
+  beforeEach(() => {
+    vi.mocked(logger.warn).mockReset();
+    vi.mocked(logger.warn).mockImplementation(() => undefined);
+  });
+
+  it('logs an entry it applied even when a subscriber throws at the end of the batch', () => {
+    const state: Record<string, unknown> = { x: 0, p: {} };
+    let subscriberThrows = true;
+    const reconciler = createReconciler({
+      serviceId: 'svc',
+      // `applyLocal` runs subscribers when its batch ends, after the mutation, and rethrows.
+      setState: (mutate) => {
+        mutate(state);
+        if (subscriberThrows) {
+          subscriberThrows = false;
+          throw new Error('subscriber');
+        }
+      },
+    });
+    const write = {
+      serviceId: 'svc',
+      stamp: stamp('z', 1, 2),
+      command: 'setBoth',
+      patch: [
+        { op: 'replace' as const, path: '/x', value: 1 },
+        { op: 'add' as const, path: '/p/k', value: 'v' },
+      ],
+    };
+
+    expect(() => reconciler.tryPlaceEntry(write)).toThrow('subscriber');
+    reconciler.tryPlaceEntry(write);
+    reconciler.tryPlaceEntry({
+      serviceId: 'svc',
+      stamp: stamp('a', 1, 1),
+      command: 'removeP',
+      patch: [{ op: 'remove', path: '/p' }],
+    });
+
+    expect(state).toEqual({ x: 0 });
+    expect(reconciler.vector).toEqual({ a: 1, z: 1 });
+  });
+});
+
 describe('log window eviction', () => {
   beforeEach(() => {
     vi.useFakeTimers();

@@ -223,4 +223,25 @@ describe('connectRuntimeToChannel request policy', () => {
     expect(emitted(SERVICE_ENTRY)[0]).toBe(stale);
     expect(state).toEqual({ x: 'a' });
   });
+
+  it('keeps the queued repair outstanding when a hub hears the echo of the reply it forwarded', () => {
+    const { channel, emitted } = connect({ relay: true });
+    vi.advanceTimersByTime(1000);
+    channel.emitExternal(SERVICE_ENTRY, entry('w', 2, '/a'));
+    channel.emitExternal(SERVICE_ENTRY, entry('w', 3, '/b'));
+    channel.emit.mockClear();
+
+    channel.emitExternal(SERVICE_SYNC_REPLY, {
+      serviceId: SERVICE_ID,
+      runtimeId: 'peer',
+      frontier: { vector: { w: 1 }, clock: 1 },
+      state: {},
+    });
+    expect(emitted(SERVICE_SYNC_REPLY)).toHaveLength(1);
+    expect(emitted(SERVICE_SYNC_REQUEST)).toHaveLength(1);
+
+    channel.emitExternal(SERVICE_ENTRY, entry('w', 5, '/c'));
+
+    expect(emitted(SERVICE_SYNC_REQUEST)).toHaveLength(1);
+  });
 });
