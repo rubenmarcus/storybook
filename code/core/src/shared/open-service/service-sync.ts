@@ -246,7 +246,8 @@ export function createReconciler(options: {
   const log: StoredLogEntry[] = [];
   const logKeys = new Set<string>();
   // Stamps dropped as beyond-window, so a redelivery is a duplicate and a hub forwards each
-  // dropped stamp once. Cleared on install because install moves both floors.
+  // dropped stamp once. Cleared on install because install moves both floors. Not bounded: two hubs
+  // that each forget a stamp they dropped bounce it between them forever.
   const dropped = new Set<string>();
   let floor: EntryStamp | undefined;
 
@@ -255,13 +256,6 @@ export function createReconciler(options: {
   const vectorOf = (runtimeId: string): number => vector.get(runtimeId) ?? 0;
 
   const hasStamp = (stamp: EntryStamp): boolean => logKeys.has(entryStampKey(stamp));
-
-  const rememberDropped = (key: string): void => {
-    dropped.add(key);
-    if (dropped.size > logWindow.maxEntries) {
-      dropped.delete(dropped.values().next().value!);
-    }
-  };
 
   const silentMissingRemove = (): void => undefined;
 
@@ -485,7 +479,7 @@ export function createReconciler(options: {
         logger.warn(
           `Open-service sync: entry beyond the log window. service=${serviceId} stamps=${key}${floorLabel} paths=${patchPaths(patch)} command=${command}`
         );
-        rememberDropped(key);
+        dropped.add(key);
         return 'beyond-window';
       }
 
